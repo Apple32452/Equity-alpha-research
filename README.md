@@ -1,70 +1,136 @@
-# Cross-Sectional Equity Alpha Research Pipeline
+# Cross-Sectional Equity Research & Backtesting Pipeline
 
-A reproducible daily equity-research pipeline for evaluating cross-sectional momentum, reversal, volatility, and liquidity features under next-day-return, transaction-cost-aware, liquidity-aware, chronological split, and regime-diagnostic settings.
+A reproducible Python research pipeline for testing cross-sectional U.S. equity signals with daily historical data, long–short portfolio construction, execution-aware trading controls, and transaction-cost modeling.
 
-> **Research prototype, not a live trading system.** Results are simulated historical backtests. They are not live PnL, investment advice, a production execution system, or an institutional-grade market-impact model.
+> **Research prototype only.** This repository is designed for historical simulation and research diagnostics. It is not a live trading system, investment recommendation, or institutional-grade execution platform.
 
-## What it implements
+## Overview
 
-- A configurable U.S.-equity universe (the included `example_universe_300.csv` contains 300+ liquid U.S. ticker symbols).
-- Two data modes:
-  - `synthetic`: deterministic OHLCV data for software validation only.
-  - `yfinance`: public daily OHLCV download for a supplied universe.
-- Data cleaning: canonical long panel, duplicate removal, price/volume validation, ticker-history filters, and cross-sectional winsorization.
-- Features formed using data through the close of day `t`:
-  - 21-day and 63-day momentum
-  - 5-day short-term reversal
-  - 21-day and 63-day realized volatility
-  - 20-day average dollar volume and cross-sectional liquidity rank
-- A fixed momentum baseline and a fixed composite signal.
-- Long/short portfolio construction with a liquidity screen, inverse-volatility sizing, trade/no-trade threshold, daily turnover cap, and drawdown-triggered gross-exposure reduction.
-- Close(`t`) to close(`t+1`) portfolio evaluation, preventing same-day signal/return look-ahead.
-- Simulated transaction costs: commissions, half-spread, and liquidity-scaled slippage.
-- Diagnostics: zero-risk-free-rate Sharpe, drawdown, turnover, rank IC, chronological in/validation/OOS partitions, calm/volatile/stress summaries, and slippage sensitivity.
+The pipeline evaluates whether predefined cross-sectional predictors retain information about next-day returns after accounting for liquidity, volatility, turnover, drawdowns, and modeled trading costs.
 
-## Important interpretation limits
+It supports two modes:
 
-1. The baseline-versus-improved comparison changes both the signal and portfolio-construction choices. It is **not** an attribution study proving that one individual feature caused the performance difference.
-2. The rank-IC t-statistic uses an IID approximation. It is not HAC/Newey-West adjusted.
-3. Regime labels are **retrospective diagnostics** based on full-sample market volatility quantiles and drawdown states. They are not a real-time regime model.
-4. The cost model is intended for sensitivity analysis. It excludes borrow fees, participation limits, calibrated square-root market impact, exchange fees/rebates, intraday order-book depth, and production execution logic.
-5. Public yfinance data can change through corrections, ticker changes, survivorship issues, and vendor adjustments. Preserve raw data and all exported reports for any external claim.
-6. Synthetic performance output is only a code-path test and must never be used on a resume, portfolio, interview, or investment discussion.
+* `synthetic`: deterministic OHLCV generation for unit tests and software validation.
+* `yfinance`: public daily historical OHLCV data for empirical research.
+
+Synthetic results are used only to validate that the research and backtesting workflow executes correctly. Historical-data results are the appropriate basis for interpreting the strategy diagnostics.
+
+## Research workflow
+
+The pipeline performs the following steps:
+
+1. Downloads or generates daily OHLCV data.
+2. Cleans the equity panel by removing duplicates, invalid prices, invalid volumes, and tickers with insufficient history.
+3. Constructs cross-sectional momentum, reversal, volatility, and liquidity features using information available through the close of day (t).
+4. Forms signals at close (t) and evaluates realized close-to-close returns from (t) to (t+1).
+5. Builds market-neutral long–short portfolios.
+6. Applies transaction costs, liquidity-aware slippage, turnover constraints, and risk controls.
+7. Exports performance, rank-IC, chronological-split, regime, turnover, drawdown, holdings, and slippage-sensitivity diagnostics.
+
+## Features
+
+The feature set includes:
+
+* 21-day momentum
+* 63-day momentum
+* 5-day short-term reversal
+* 21-day realized volatility
+* 63-day realized volatility
+* 20-day average dollar volume
+* Cross-sectional liquidity rank
+* Cross-sectional percentile ranks for each predictor
+
+All features are winsorized cross-sectionally before ranking. The target variable is the next trading day's return, which avoids using future returns in signal construction.
+
+## Strategy comparison
+
+The repository compares two fixed research configurations.
+
+### Baseline
+
+* Momentum-only signal using 21-day and 63-day momentum ranks
+* Equal-weighted long–short construction
+* Long the top 10% and short the bottom 10% of eligible names
+* No liquidity screen, trade threshold, turnover cap, or drawdown exposure reduction
+
+### Improved execution-aware configuration
+
+* Composite signal combining momentum, reversal, and low-volatility ranks
+* Liquidity filter retaining names above the 30th percentile of average dollar volume
+* Inverse-volatility position sizing
+* Trade/no-trade threshold to avoid very small rebalances
+* Maximum one-way daily turnover cap of 35%
+* Gross-exposure reduction when the market proxy drawdown reaches -10%
+
+The baseline-versus-improved comparison is an end-to-end research comparison. It does not isolate the causal contribution of any single feature or execution control.
+
+## Verified historical-data run
+
+A historical `yfinance` run requested a 300-symbol U.S. equity universe. After data-availability and minimum-history filtering, 76 equities were retained across 771 trading days.
+
+| Metric                                  | Baseline | Improved |
+| --------------------------------------- | -------: | -------: |
+| Total return                            |   -7.95% |   -6.15% |
+| Annualized return                       |   -2.67% |   -2.05% |
+| Annualized volatility                   |   15.34% |   11.92% |
+| Net Sharpe ratio, zero risk-free rate   |   -0.100 |   -0.115 |
+| Gross Sharpe ratio, zero risk-free rate |    0.327 |    0.326 |
+| Maximum drawdown                        |  -33.32% |  -23.19% |
+| Average daily turnover                  |   16.26% |   16.10% |
+| Average modeled daily cost              | 2.60 bps | 2.08 bps |
+
+In this run, the execution-aware configuration:
+
+* Reduced annualized volatility by approximately 22%.
+* Reduced maximum drawdown magnitude by 10.1 percentage points.
+* Reduced modeled average daily trading costs by approximately 20%.
+* Kept gross Sharpe nearly unchanged at 0.326 versus 0.327.
+* Did not produce positive net simulated returns under the stated assumptions.
+
+These results should be interpreted as risk-control and execution diagnostics rather than evidence of deployable alpha.
 
 ## Repository structure
 
 ```text
 equity-alpha-research-pipeline/
-├── data/universe/
-│   ├── example_universe_50.csv
-│   └── example_universe_300.csv
-├── src/equity_alpha/
-│   ├── backtest.py
-│   ├── data.py
-│   ├── features.py
-│   ├── metrics.py
-│   ├── portfolio.py
-│   ├── reporting.py
-│   ├── run_pipeline.py
-│   └── signals.py
-├── tests/test_pipeline.py
+├── data/
+│   └── universe/
+│       ├── example_universe_50.csv
+│       └── example_universe_300.csv
+├── src/
+│   └── equity_alpha/
+│       ├── backtest.py
+│       ├── data.py
+│       ├── features.py
+│       ├── metrics.py
+│       ├── portfolio.py
+│       ├── reporting.py
+│       ├── run_pipeline.py
+│       └── signals.py
+├── tests/
+│   └── test_pipeline.py
+├── outputs/
 ├── requirements.txt
 ├── pyproject.toml
 └── README.md
 ```
 
-## Setup
+## Installation
 
 ```bash
+git clone <YOUR-REPOSITORY-URL>
 cd equity-alpha-research-pipeline
+
 python -m venv .venv
 source .venv/bin/activate
+
 pip install -r requirements.txt
 pip install -e .
+
 pytest -q
 ```
 
-## Run the deterministic software-validation demo
+## Run the synthetic software-validation demo
 
 ```bash
 python -m equity_alpha.run_pipeline \
@@ -80,16 +146,15 @@ python -m equity_alpha.run_pipeline \
   --save-feature-frame
 ```
 
-## Run historical public-data research
+## Run historical-data research
 
 ```bash
 python -m equity_alpha.run_pipeline \
   --data-source yfinance \
   --universe-file data/universe/example_universe_300.csv \
   --max-tickers 300 \
-  --start 2023-01-01 \
-  --end 2026-01-01 \
-  --min-history 500 \
+  --start 2023-06-01 \
+  --min-history 252 \
   --commission-bps 1.0 \
   --half-spread-bps 2.0 \
   --slippage-bps 4.0 \
@@ -98,21 +163,71 @@ python -m equity_alpha.run_pipeline \
   --save-feature-frame
 ```
 
-`data.py` uses a manual wide-to-long conversion rather than `DataFrame.stack(dropna=False)`, so it runs under pandas 2.x and pandas 3.x. It also assigns yfinance a project-local timezone cache directory, which avoids the common macOS default-cache-path failure.
+The final number of retained equities may be lower than the requested universe size because tickers can fail downloads, have insufficient history, be delisted, or have incomplete price and volume data.
 
 ## Main outputs
 
-- `baseline_daily_backtest.csv`, `improved_daily_backtest.csv`
-- `baseline_summary.csv`, `improved_summary.csv`, `strategy_comparison.csv`
-- `rank_ic_summary.csv` and per-date rank-IC files
-- chronological split and regime summary CSVs
-- slippage-sensitivity CSVs
-- holdings, feature frame (optional), three PNG figures, run metadata, and `resume_metrics.json`
+Each run writes reports to the chosen output directory:
 
-The `resume_metrics.json` file is an auditable convenience export, not proof that a value should be used externally. Verify every value against the CSV reports, exact universe, date range, execution assumptions, source data, and repository commit.
+```text
+baseline_daily_backtest.csv
+improved_daily_backtest.csv
+baseline_summary.csv
+improved_summary.csv
+strategy_comparison.csv
+rank_ic_summary.csv
+baseline_rank_ic_by_date.csv
+improved_rank_ic_by_date.csv
+baseline_chronological_split_summary.csv
+improved_chronological_split_summary.csv
+baseline_regime_summary.csv
+improved_regime_summary.csv
+baseline_slippage_sensitivity.csv
+improved_slippage_sensitivity.csv
+baseline_holdings.csv
+improved_holdings.csv
+feature_frame.csv
+equity_curve.png
+drawdown.png
+turnover.png
+run_metadata.json
+resume_metrics.json
+```
 
-## Resume-safe wording after a verified historical run
+## Diagnostics
 
-> Built a reproducible cross-sectional equity research pipeline over a documented U.S. equity universe, generating momentum, reversal, volatility, and liquidity features at close `t` and evaluating long/short portfolios on close-to-close next-day returns with simulated transaction costs, turnover controls, and regime diagnostics.
+The pipeline reports:
 
-Only add numerical Sharpe, turnover, slippage, or drawdown claims after reproducing them from a preserved historical-data run and its exported reports.
+* Net and gross zero-risk-free-rate Sharpe ratios
+* Annualized return and volatility
+* Maximum drawdown
+* Daily and annualized turnover
+* Modeled trading costs
+* Spearman rank information coefficient between each signal and next-day returns
+* Chronological in-sample, validation, and out-of-sample summaries
+* Retrospective calm, volatile, and stress regime summaries
+* Slippage sensitivity from 0 to 12 basis points
+
+## Reproducibility notes
+
+* Signals are generated using data available through close (t).
+* Portfolio returns use the next-day close-to-close return from (t) to (t+1).
+* Transaction costs include commissions, half-spread, and liquidity-scaled slippage.
+* The code uses a project-local `yfinance` cache directory to avoid common macOS cache-path issues.
+* The downloader uses a manual wide-to-long conversion compatible with pandas 2.x and pandas 3.x.
+* Public market data can change due to ticker changes, corrections, corporate actions, vendor adjustments, or missing history.
+
+For any external use of metrics, preserve the output folder, repository commit, command-line parameters, data-download date, retained universe, and cost assumptions.
+
+## Limitations
+
+* Historical backtests do not guarantee future performance.
+* The cost model is a simplified sensitivity model and does not include borrow fees, market impact calibration, order-book depth, participation limits, exchange rebates, or intraday execution.
+* Regime labels are retrospective diagnostics, not a real-time regime classifier.
+* The rank-IC t-statistic uses an IID approximation and is not Newey-West adjusted.
+* The strategy comparison changes both signal construction and portfolio controls, so it should not be interpreted as a single-factor attribution analysis.
+* Synthetic-data performance is not used as evidence of real-world predictive performance.
+
+## Author
+
+Taewoon Choi
