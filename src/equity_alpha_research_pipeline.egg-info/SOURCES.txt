@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+src/equity_alpha/__init__.py
+src/equity_alpha/backtest.py
+src/equity_alpha/data.py
+src/equity_alpha/features.py
+src/equity_alpha/metrics.py
+src/equity_alpha/portfolio.py
+src/equity_alpha/reporting.py
+src/equity_alpha/run_pipeline.py
+src/equity_alpha/signals.py
+src/equity_alpha_research_pipeline.egg-info/PKG-INFO
+src/equity_alpha_research_pipeline.egg-info/SOURCES.txt
+src/equity_alpha_research_pipeline.egg-info/dependency_links.txt
+src/equity_alpha_research_pipeline.egg-info/requires.txt
+src/equity_alpha_research_pipeline.egg-info/top_level.txt
+tests/test_pipeline.py
